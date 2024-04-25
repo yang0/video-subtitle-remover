@@ -908,16 +908,63 @@ class SubtitleRemover:
             self.video_temp_file.close()
 
 
+import os
+
+# 把处理过的视频忽略掉
+def should_ignore_file(file_path, ignore_prefixes):
+    # 获取文件的基本名和扩展名
+    file_base_name, file_extension = os.path.splitext(os.path.basename(file_path))
+    # 检查文件名是否包含需要忽略的前缀
+    for prefix in ignore_prefixes:
+        if file_base_name.lower().endswith(prefix):
+            return True
+        # 检查是否存在相同文件名但带有特定后缀的文件
+        ignore_file_name = file_base_name + prefix + file_extension
+        path = os.path.join(os.path.dirname(file_path), ignore_file_name)
+        if os.path.exists(path):
+            return True
+    return False
+
+def get_video_files(directory):
+    # 支持的视频文件扩展名列表
+    video_extensions = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.mpg')
+    ignore_prefixes = ('_no_sub', '_procceesed')
+    # 递归地查找所有视频文件，同时过滤掉不需要的视频
+    video_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            # 获取文件的完整路径
+            file_path = os.path.join(root, file)
+            # 检查文件扩展名是否为视频文件
+            if file.lower().endswith(tuple(video_extensions)):
+                # 检查文件名是否包含需要忽略的前缀
+                if not should_ignore_file(file_path, ignore_prefixes):
+                    video_files.append(file_path)
+    return video_files
+
+
+
 if __name__ == '__main__':
     multiprocessing.set_start_method("spawn")
     # 1. 提示用户输入视频路径
     video_path = input(f"Please input video or image file path: ").strip()
     # 判断视频路径是不是一个目录，是目录的化，批量处理改目录下的所有视频文件
-    # 2. 按以下顺序传入字幕区域
-    # sub_area = (ymin, ymax, xmin, xmax)
-    # 3. 新建字幕提取对象
-    if is_video_or_image(video_path):
-        sd = SubtitleRemover(video_path, sub_area=None)
-        sd.run()
+    
+    if os.path.exists(video_path) and os.path.isdir(video_path):
+        print(f"正在搜索目录：{video_path} 中的视频文件...")
+        videos = get_video_files(video_path, )
+        if videos:
+            print("找到的视频文件有：")
+            for video in videos:
+                print("正在处理：", video)
+                sd = SubtitleRemover(video, sub_area=None)
+                sd.run()
+        else:
+            print("没有找到视频文件。")
     else:
-        print(f'Invalid video path: {video_path}')
+        if is_video_or_image(video_path):
+            sd = SubtitleRemover(video_path, sub_area=None)
+            sd.run()
+        else:
+            print(f'Invalid video path: {video_path}')
+
